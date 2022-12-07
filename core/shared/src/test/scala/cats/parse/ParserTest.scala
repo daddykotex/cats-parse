@@ -666,6 +666,49 @@ class ParserTest extends munit.ScalaCheckSuite {
   val cCIP1 = Parser.ignoreCaseChar('a')
   val abcCI = Parser.ignoreCaseCharIn('a', 'b', 'c')
 
+  // run with `sbt "~coreJVM/testOnly *ParserTest"`
+  test("xout of order".only) {
+    import cats.parse.Parser
+    import cats.parse.Rfc5234.{alpha, lf, crlf}
+
+    case class V1(value: String)
+    case class V2(value: String)
+    case class V3(value: String)
+
+    final case class Op(v1: V1, v2: V2, v3: V3)
+
+    val nl: Parser[Unit] = lf | crlf
+
+    val v1P = Parser.string("v1:") ~ alpha.rep.string
+    val v2P = Parser.string("v2:") ~ alpha.rep.string
+    val v3P = Parser.string("v3:") ~ alpha.rep.string
+
+    // how do I define a parser to support input where things are not
+    // in the order expected: v1,v2,v3 vs v1,v3,v2 for example
+    val parser = (v1P <* nl) ~ (v3P <* nl) ~ (v2P <* nl)
+
+    assert(
+      parser
+        .parse(
+          """|v1:one
+             |v3:three
+             |v2:two
+             |""".stripMargin
+        )
+        .isRight
+    )
+    assert(
+      parser
+        .parse(
+          """|v1:one
+             |v2:two
+             |v3:three
+             |""".stripMargin
+        )
+        .isRight
+    )
+  }
+
   test("string tests") {
     parseTest(fooP, "foobar", ())
     parseFail(fooP, "FOO")
